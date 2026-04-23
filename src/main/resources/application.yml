@@ -1,0 +1,24 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:${DB_PORT:5432}/${POSTGRES_DB:audit_log}
+    username: ${POSTGRES_USER:audit}
+    password: ${POSTGRES_PASSWORD:audit}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+audit:
+  retention:
+    days: 365
+    archive-dir: ${AUDIT_ARCHIVE_DIR:/tmp/audit-archive}
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html

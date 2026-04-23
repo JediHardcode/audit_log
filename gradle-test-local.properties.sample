@@ -1,0 +1,20 @@
+# Local-only Testcontainers overrides for the `test` task.
+# Copy this file to `gradle-test-local.properties` and adjust for your machine.
+# The real file is gitignored. CI does not use it — it relies on the default
+# /var/run/docker.sock provided by the runner.
+#
+# When to use it: running Docker Desktop on Linux. Desktop exposes its Engine
+# API on ~/.docker/desktop/docker.sock (not /var/run/docker.sock), and the
+# Engine requires API version >= 1.44, which is newer than docker-java's
+# default. Ryuk also needs the in-VM socket path for bind-mounts.
+#
+# Leave any line blank/missing to skip that override.
+
+# Path to the Docker Engine socket Testcontainers should connect to.
+docker.host=unix:///home/<you>/.docker/desktop/docker.sock
+
+# Socket path bind-mounted into Ryuk (must be valid inside Desktop's VM).
+docker.socket.override=/var/run/docker.sock
+
+# Pin docker-java's API version to one Desktop accepts.
+api.version=1.44
