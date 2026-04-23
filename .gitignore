@@ -7,6 +7,9 @@ out/
 *.log
 .DS_Store
 gradle-test-local.properties
-/gradle/
+/gradle/*
+!/gradle/wrapper/
+!/gradle/wrapper/gradle-wrapper.jar
+!/gradle/wrapper/gradle-wrapper.properties
 /.codex/
 /.claude/
