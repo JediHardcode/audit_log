@@ -8,3 +8,5 @@ out/
 .DS_Store
 gradle-test-local.properties
 /gradle/
+/.codex/
+/.claude/
