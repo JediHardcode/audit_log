@@ -35,10 +35,7 @@ public class RetentionJob {
     @Value("${audit.retention.archive-dir}")
     private String archiveDir;
 
-    /**
-     * Archives and deletes events older than audit.retention.days.
-     * Deletion happens only after successful archive write.
-     */
+    /** Exports old events to archive storage without mutating the append-only table. */
     @Scheduled(cron = "0 0 3 * * *")
     @Transactional
     public void run() {
@@ -53,11 +50,10 @@ public class RetentionJob {
         try {
             writeArchive(archiveFile, events);
         } catch (IOException e) {
-            log.error("Retention archive write failed — skipping deletion", e);
+            log.error("Retention archive write failed", e);
             return;
         }
 
-        retentionRepository.deleteOlderThan(cutoff);
         log.info("Archived {} events older than {} to {}", events.size(), cutoff, archiveFile);
     }
 

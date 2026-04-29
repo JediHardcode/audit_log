@@ -24,6 +24,7 @@ import java.time.Instant;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -51,7 +52,7 @@ class AuditEventIntegrationTest {
 
     @BeforeEach
     void cleanUp() {
-        jdbcTemplate.execute("DELETE FROM audit_events");
+        jdbcTemplate.execute("TRUNCATE TABLE audit_events");
     }
 
     @Test
@@ -155,6 +156,43 @@ class AuditEventIntegrationTest {
                 buildRequest("u:1", "logout", "app:1", Outcome.SUCCESS), AuditEventResponse.class);
 
         assertThat(hashChainService.verifyChain()).isTrue();
+    }
+
+    @Test
+    void auditEventsTable_rejectsUpdate() {
+        AuditEventResponse created = restTemplate.postForEntity(
+                "/audit-events",
+                buildRequest("user:7", "project.updated", "project:77", Outcome.SUCCESS),
+                AuditEventResponse.class
+        ).getBody();
+
+        assertThat(created).isNotNull();
+
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                "UPDATE audit_events SET actor = ? WHERE id = ?",
+                "user:8",
+                created.getId()
+        ))
+                .hasMessageContaining("audit_events is append-only")
+                .hasMessageContaining("UPDATE");
+    }
+
+    @Test
+    void auditEventsTable_rejectsDelete() {
+        AuditEventResponse created = restTemplate.postForEntity(
+                "/audit-events",
+                buildRequest("user:9", "project.deleted", "project:99", Outcome.SUCCESS),
+                AuditEventResponse.class
+        ).getBody();
+
+        assertThat(created).isNotNull();
+
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                "DELETE FROM audit_events WHERE id = ?",
+                created.getId()
+        ))
+                .hasMessageContaining("audit_events is append-only")
+                .hasMessageContaining("DELETE");
     }
 
     private CreateAuditEventRequest buildRequest(String actor, String action, String resource, Outcome outcome) {
