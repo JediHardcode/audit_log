@@ -1,5 +1,12 @@
 package kirill.ked.auditlog.unit;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+import java.time.Instant;
+import java.util.Optional;
+import java.util.UUID;
 import kirill.ked.auditlog.api.AuditEventResponse;
 import kirill.ked.auditlog.api.CreateAuditEventRequest;
 import kirill.ked.auditlog.domain.AuditEventService;
@@ -13,17 +20,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.time.Instant;
-import java.util.Optional;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.within;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
-
-import java.time.temporal.ChronoUnit;
 
 @ExtendWith(MockitoExtension.class)
 class AuditEventServiceTest {
@@ -103,8 +99,16 @@ class AuditEventServiceTest {
 
         service.create(buildRequest());
 
-        verify(hashChainService).computeHash(anyString(), any(UUID.class), any(Instant.class),
-                eq("user:1"), eq("doc.created"), eq("doc:99"), eq(Outcome.SUCCESS), isNull());
+        verify(hashChainService)
+                .computeHash(
+                        anyString(),
+                        any(UUID.class),
+                        any(Instant.class),
+                        eq("user:1"),
+                        eq("doc.created"),
+                        eq("doc:99"),
+                        eq(Outcome.SUCCESS),
+                        isNull());
     }
 
     @Test

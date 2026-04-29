@@ -1,14 +1,13 @@
 package kirill.ked.auditlog.api;
 
 import jakarta.validation.ConstraintViolationException;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-
-import java.util.List;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -19,8 +18,7 @@ public class GlobalExceptionHandler {
                 .map(e -> e.getField() + ": " + e.getDefaultMessage())
                 .toList();
         String message = details.isEmpty() ? "Validation failed" : details.get(0);
-        return ResponseEntity.badRequest()
-                .body(new ErrorResponse("validation_failed", message, details));
+        return ResponseEntity.badRequest().body(new ErrorResponse("validation_failed", message, details));
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
@@ -28,8 +26,7 @@ public class GlobalExceptionHandler {
         List<String> details = ex.getConstraintViolations().stream()
                 .map(v -> v.getPropertyPath() + ": " + v.getMessage())
                 .toList();
-        return ResponseEntity.badRequest()
-                .body(new ErrorResponse("validation_failed", details.get(0), details));
+        return ResponseEntity.badRequest().body(new ErrorResponse("validation_failed", details.get(0), details));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)

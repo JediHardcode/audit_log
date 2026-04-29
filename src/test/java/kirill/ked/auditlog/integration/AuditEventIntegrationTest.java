@@ -1,11 +1,16 @@
 package kirill.ked.auditlog.integration;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Instant;
+import java.util.Map;
 import kirill.ked.auditlog.api.AuditEventResponse;
 import kirill.ked.auditlog.api.CreateAuditEventRequest;
 import kirill.ked.auditlog.api.PagedResponse;
 import kirill.ked.auditlog.domain.Outcome;
 import kirill.ked.auditlog.hashchain.HashChainService;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,19 +25,12 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-import java.time.Instant;
-import java.util.Map;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 @Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class AuditEventIntegrationTest {
 
     @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16")
-            .withReuse(true);
+    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16").withReuse(true);
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
@@ -64,8 +62,8 @@ class AuditEventIntegrationTest {
     void postAndGet_happyPath() {
         CreateAuditEventRequest request = buildRequest("user:42", "project.updated", "project:17", Outcome.SUCCESS);
 
-        ResponseEntity<AuditEventResponse> postResponse = restTemplate.postForEntity(
-                "/audit-events", request, AuditEventResponse.class);
+        ResponseEntity<AuditEventResponse> postResponse =
+                restTemplate.postForEntity("/audit-events", request, AuditEventResponse.class);
 
         assertThat(postResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         AuditEventResponse created = postResponse.getBody();
@@ -75,11 +73,8 @@ class AuditEventIntegrationTest {
         assertThat(created.getActor()).isEqualTo("user:42");
         assertThat(created.getEventHash()).isNotBlank();
 
-        ResponseEntity<PagedResponse<AuditEventResponse>> getResponse = restTemplate.exchange(
-                "/audit-events",
-                HttpMethod.GET,
-                null,
-                new ParameterizedTypeReference<>() {});
+        ResponseEntity<PagedResponse<AuditEventResponse>> getResponse =
+                restTemplate.exchange("/audit-events", HttpMethod.GET, null, new ParameterizedTypeReference<>() {});
 
         assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(getResponse.getBody().getContent()).hasSize(1);
@@ -95,8 +90,7 @@ class AuditEventIntegrationTest {
                 "action", "login",
                 "resource", "app:1",
                 "outcome", "success",
-                "timestamp", clientTimestamp.toString()
-        );
+                "timestamp", clientTimestamp.toString());
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -104,8 +98,8 @@ class AuditEventIntegrationTest {
         HttpEntity<String> entity = new HttpEntity<>(json, headers);
 
         Instant before = Instant.now();
-        ResponseEntity<AuditEventResponse> response = restTemplate.exchange(
-                "/audit-events", HttpMethod.POST, entity, AuditEventResponse.class);
+        ResponseEntity<AuditEventResponse> response =
+                restTemplate.exchange("/audit-events", HttpMethod.POST, entity, AuditEventResponse.class);
         Instant after = Instant.now();
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
@@ -129,15 +123,14 @@ class AuditEventIntegrationTest {
     @Test
     void pagination_secondPage() {
         for (int i = 0; i < 120; i++) {
-            restTemplate.postForEntity("/audit-events",
+            restTemplate.postForEntity(
+                    "/audit-events",
                     buildRequest("user:" + i, "action", "resource:1", Outcome.SUCCESS),
                     AuditEventResponse.class);
         }
 
         ResponseEntity<PagedResponse<AuditEventResponse>> response = restTemplate.exchange(
-                "/audit-events?page=1&size=50",
-                HttpMethod.GET, null,
-                new ParameterizedTypeReference<>() {});
+                "/audit-events?page=1&size=50", HttpMethod.GET, null, new ParameterizedTypeReference<>() {});
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         PagedResponse<AuditEventResponse> body = response.getBody();
@@ -148,49 +141,45 @@ class AuditEventIntegrationTest {
 
     @Test
     void hashChain_verifyAfterInserts() {
-        restTemplate.postForEntity("/audit-events",
-                buildRequest("u:1", "login", "app:1", Outcome.SUCCESS), AuditEventResponse.class);
-        restTemplate.postForEntity("/audit-events",
-                buildRequest("u:2", "update", "doc:1", Outcome.SUCCESS), AuditEventResponse.class);
-        restTemplate.postForEntity("/audit-events",
-                buildRequest("u:1", "logout", "app:1", Outcome.SUCCESS), AuditEventResponse.class);
+        restTemplate.postForEntity(
+                "/audit-events", buildRequest("u:1", "login", "app:1", Outcome.SUCCESS), AuditEventResponse.class);
+        restTemplate.postForEntity(
+                "/audit-events", buildRequest("u:2", "update", "doc:1", Outcome.SUCCESS), AuditEventResponse.class);
+        restTemplate.postForEntity(
+                "/audit-events", buildRequest("u:1", "logout", "app:1", Outcome.SUCCESS), AuditEventResponse.class);
 
         assertThat(hashChainService.verifyChain()).isTrue();
     }
 
     @Test
     void auditEventsTable_rejectsUpdate() {
-        AuditEventResponse created = restTemplate.postForEntity(
-                "/audit-events",
-                buildRequest("user:7", "project.updated", "project:77", Outcome.SUCCESS),
-                AuditEventResponse.class
-        ).getBody();
+        AuditEventResponse created = restTemplate
+                .postForEntity(
+                        "/audit-events",
+                        buildRequest("user:7", "project.updated", "project:77", Outcome.SUCCESS),
+                        AuditEventResponse.class)
+                .getBody();
 
         assertThat(created).isNotNull();
 
         assertThatThrownBy(() -> jdbcTemplate.update(
-                "UPDATE audit_events SET actor = ? WHERE id = ?",
-                "user:8",
-                created.getId()
-        ))
+                        "UPDATE audit_events SET actor = ? WHERE id = ?", "user:8", created.getId()))
                 .hasMessageContaining("audit_events is append-only")
                 .hasMessageContaining("UPDATE");
     }
 
     @Test
     void auditEventsTable_rejectsDelete() {
-        AuditEventResponse created = restTemplate.postForEntity(
-                "/audit-events",
-                buildRequest("user:9", "project.deleted", "project:99", Outcome.SUCCESS),
-                AuditEventResponse.class
-        ).getBody();
+        AuditEventResponse created = restTemplate
+                .postForEntity(
+                        "/audit-events",
+                        buildRequest("user:9", "project.deleted", "project:99", Outcome.SUCCESS),
+                        AuditEventResponse.class)
+                .getBody();
 
         assertThat(created).isNotNull();
 
-        assertThatThrownBy(() -> jdbcTemplate.update(
-                "DELETE FROM audit_events WHERE id = ?",
-                created.getId()
-        ))
+        assertThatThrownBy(() -> jdbcTemplate.update("DELETE FROM audit_events WHERE id = ?", created.getId()))
                 .hasMessageContaining("audit_events is append-only")
                 .hasMessageContaining("DELETE");
     }

@@ -1,14 +1,13 @@
 package kirill.ked.auditlog.api;
 
+import java.time.Instant;
+import java.util.Map;
+import java.util.UUID;
 import kirill.ked.auditlog.domain.Outcome;
 import kirill.ked.auditlog.persistence.AuditEventEntity;
 import lombok.Builder;
 import lombok.Value;
 import lombok.extern.jackson.Jacksonized;
-
-import java.time.Instant;
-import java.util.Map;
-import java.util.UUID;
 
 @Value
 @Builder

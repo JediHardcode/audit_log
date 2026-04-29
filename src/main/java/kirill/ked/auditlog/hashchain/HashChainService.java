@@ -1,14 +1,7 @@
 package kirill.ked.auditlog.hashchain;
 
-import kirill.ked.auditlog.domain.Outcome;
-import kirill.ked.auditlog.persistence.AuditEventEntity;
-import kirill.ked.auditlog.persistence.AuditEventRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.stereotype.Service;
-
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -17,12 +10,19 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import kirill.ked.auditlog.domain.Outcome;
+import kirill.ked.auditlog.persistence.AuditEventEntity;
+import kirill.ked.auditlog.persistence.AuditEventRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
 public class HashChainService {
 
     private final AuditEventRepository repository;
+
     @Qualifier("canonicalMapper")
     private final ObjectMapper canonicalMapper;
 
@@ -31,17 +31,17 @@ public class HashChainService {
      *
      * @param prevHash previous event's hash, or "GENESIS" for the first event
      */
-    public String computeHash(String prevHash, UUID id, Instant timestamp,
-                               String actor, String action, String resource,
-                               Outcome outcome, Map<String, Object> context) {
-        String input = prevHash
-                + id
-                + timestamp
-                + actor
-                + action
-                + resource
-                + outcome.toJson()
-                + serializeContext(context);
+    public String computeHash(
+            String prevHash,
+            UUID id,
+            Instant timestamp,
+            String actor,
+            String action,
+            String resource,
+            Outcome outcome,
+            Map<String, Object> context) {
+        String input =
+                prevHash + id + timestamp + actor + action + resource + outcome.toJson() + serializeContext(context);
         return sha256Hex(input);
     }
 
@@ -70,8 +70,7 @@ public class HashChainService {
                     event.getAction(),
                     event.getResource(),
                     event.getOutcome(),
-                    event.getContext()
-            );
+                    event.getContext());
             if (!expectedHash.equals(event.getEventHash())) {
                 return false;
             }

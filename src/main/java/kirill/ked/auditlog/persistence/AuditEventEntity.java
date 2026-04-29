@@ -1,17 +1,16 @@
 package kirill.ked.auditlog.persistence;
 
-import kirill.ked.auditlog.domain.Outcome;
 import jakarta.persistence.*;
+import java.time.Instant;
+import java.util.Map;
+import java.util.UUID;
+import kirill.ked.auditlog.domain.Outcome;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
-
-import java.time.Instant;
-import java.util.Map;
-import java.util.UUID;
 
 @Entity
 @Table(name = "audit_events")
@@ -49,9 +48,16 @@ public class AuditEventEntity {
     private String eventHash;
 
     @Builder
-    public AuditEventEntity(UUID id, Instant timestamp, String actor, String action,
-                             String resource, Outcome outcome, Map<String, Object> context,
-                             String prevHash, String eventHash) {
+    public AuditEventEntity(
+            UUID id,
+            Instant timestamp,
+            String actor,
+            String action,
+            String resource,
+            Outcome outcome,
+            Map<String, Object> context,
+            String prevHash,
+            String eventHash) {
         this.id = id;
         this.timestamp = timestamp;
         this.actor = actor;
