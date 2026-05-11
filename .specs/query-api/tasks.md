@@ -186,7 +186,7 @@ Spec wins. For each existing class touched by this work:
   - **Repo status:**
     - No `Clock` bean today. Spec's pagination test needs deterministic timestamps. Seed events for this test via direct `JdbcTemplate` inserts (pattern already used by `auditEventsTable_rejectsUpdate`) so the test controls timestamps without refactoring `AuditEventService.create`.
 
-- [ ] **10. Add integration tests for validation errors**
+- [x] **10. Add integration tests for validation errors**
   - **Refs:** AC-E1..AC-E10, AC-P7
   - **Depends on:** 6
   - **Scope:**
