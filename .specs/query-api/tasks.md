@@ -159,7 +159,7 @@ Spec wins. For each existing class touched by this work:
     - Existing single-column indexes (`idx_audit_events_actor`, `idx_audit_events_resource`, `idx_audit_events_timestamp`) become strict subsets of the spec composites — drop them in the same `V3__query_api_indexes.sql` migration.
     - New migration creates: `(timestamp DESC, id DESC)`, `(actor, timestamp DESC, id DESC)`, `(resource text_pattern_ops, timestamp DESC, id DESC)`, `(outcome, timestamp DESC, id DESC)`. Do not edit V1/V2.
 
-- [ ] **8. Add integration tests for filters and sorting**
+- [x] **8. Add integration tests for filters and sorting**
   - **Refs:** AC-F1..AC-F7, AC-P1, AC-P2
   - **Depends on:** 6, 7
   - **Scope:**
