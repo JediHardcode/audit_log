@@ -146,7 +146,7 @@ Spec wins. For each existing class touched by this work:
       - Add a dedicated test: unauthenticated GET returns 401 (matches AC for "Unauthenticated request rejected with same status as POST endpoint").
       - Same `SecurityFilterChain` covers POST too — write-side integration tests will need the auth header.
 
-- [~] **7. Verify and add required indexes**
+- [x] **7. Verify and add required indexes**
   - **Refs:** [design.md#indexes](./design.md#indexes), non-functional p95 < 300ms
   - **Depends on:** 2
   - **Scope:**
