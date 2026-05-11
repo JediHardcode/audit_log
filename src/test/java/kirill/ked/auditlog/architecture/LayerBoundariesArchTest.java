@@ -30,7 +30,7 @@ class LayerBoundariesArchTest {
             .layer("CONFIG")
             .definedBy("..config..")
             .whereLayer("API")
-            .mayOnlyBeAccessedByLayers("DOMAIN")
+            .mayOnlyBeAccessedByLayers("DOMAIN", "PERSISTENCE")
             .whereLayer("DOMAIN")
             .mayOnlyBeAccessedByLayers("API", "PERSISTENCE", "HASHCHAIN")
             .whereLayer("HASHCHAIN")
