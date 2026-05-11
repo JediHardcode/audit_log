@@ -197,7 +197,7 @@ Spec wins. For each existing class touched by this work:
     - AC-P7 covered with `limit=500` returning ≤200 items, status 200.
   - **Repo status:** no GET 400 tests exist. Reuse `ErrorResponse` body shape for assertions (same handler).
 
-- [ ] **11. Add resource prefix escaping tests**
+- [x] **11. Add resource prefix escaping tests**
   - **Refs:** [design.md#resource-prefix-matching](./design.md#resource-prefix-matching), AC-X1, AC-X2, AC-X3
   - **Depends on:** 8
   - **Scope:**
