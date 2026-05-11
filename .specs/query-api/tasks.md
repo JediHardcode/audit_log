@@ -172,7 +172,7 @@ Spec wins. For each existing class touched by this work:
     - Delete `pagination_secondPage` — old offset model, replaced by tasks 8/9 with cursor coverage.
     - Rewrite `postAndGet_happyPath` to assert the new `items` + `nextCursor` shape (and the new `AuditEventResponse` without hash fields).
 
-- [ ] **9. Add integration tests for pagination stability**
+- [x] **9. Add integration tests for pagination stability**
   - **Refs:** AC-P3, AC-P4, AC-P5, AC-P6
   - **Depends on:** 6, 7
   - **Scope:**
