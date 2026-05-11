@@ -3,6 +3,7 @@ package kirill.ked.auditlog.integration;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.util.Map;
@@ -27,6 +28,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class AuditEventIntegrationTest {
 
+    private static final String USER = "audit";
+    private static final String PASSWORD = "audit";
+
     @Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16").withReuse(true);
 
@@ -46,9 +50,12 @@ class AuditEventIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    private TestRestTemplate authed;
+
     @BeforeEach
     void cleanUp() {
         jdbcTemplate.execute("TRUNCATE TABLE audit_events");
+        authed = restTemplate.withBasicAuth(USER, PASSWORD);
     }
 
     @Test
@@ -61,7 +68,7 @@ class AuditEventIntegrationTest {
         CreateAuditEventRequest request = buildRequest("user:42", "project.updated", "project:17", Outcome.SUCCESS);
 
         ResponseEntity<AuditEventResponse> postResponse =
-                restTemplate.postForEntity("/audit-events", request, AuditEventResponse.class);
+                authed.postForEntity("/audit-events", request, AuditEventResponse.class);
 
         assertThat(postResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         AuditEventResponse created = postResponse.getBody();
@@ -89,7 +96,7 @@ class AuditEventIntegrationTest {
 
         Instant before = Instant.now();
         ResponseEntity<AuditEventResponse> response =
-                restTemplate.exchange("/audit-events", HttpMethod.POST, entity, AuditEventResponse.class);
+                authed.exchange("/audit-events", HttpMethod.POST, entity, AuditEventResponse.class);
         Instant after = Instant.now();
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
@@ -104,7 +111,7 @@ class AuditEventIntegrationTest {
         request.setResource("app:1");
         request.setOutcome(Outcome.SUCCESS);
 
-        ResponseEntity<Map> response = restTemplate.postForEntity("/audit-events", request, Map.class);
+        ResponseEntity<Map> response = authed.postForEntity("/audit-events", request, Map.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).containsKey("error");
@@ -112,11 +119,11 @@ class AuditEventIntegrationTest {
 
     @Test
     void hashChain_verifyAfterInserts() {
-        restTemplate.postForEntity(
+        authed.postForEntity(
                 "/audit-events", buildRequest("u:1", "login", "app:1", Outcome.SUCCESS), AuditEventResponse.class);
-        restTemplate.postForEntity(
+        authed.postForEntity(
                 "/audit-events", buildRequest("u:2", "update", "doc:1", Outcome.SUCCESS), AuditEventResponse.class);
-        restTemplate.postForEntity(
+        authed.postForEntity(
                 "/audit-events", buildRequest("u:1", "logout", "app:1", Outcome.SUCCESS), AuditEventResponse.class);
 
         assertThat(hashChainService.verifyChain()).isTrue();
@@ -124,8 +131,7 @@ class AuditEventIntegrationTest {
 
     @Test
     void auditEventsTable_rejectsUpdate() {
-        AuditEventResponse created = restTemplate
-                .postForEntity(
+        AuditEventResponse created = authed.postForEntity(
                         "/audit-events",
                         buildRequest("user:7", "project.updated", "project:77", Outcome.SUCCESS),
                         AuditEventResponse.class)
@@ -141,8 +147,7 @@ class AuditEventIntegrationTest {
 
     @Test
     void auditEventsTable_rejectsDelete() {
-        AuditEventResponse created = restTemplate
-                .postForEntity(
+        AuditEventResponse created = authed.postForEntity(
                         "/audit-events",
                         buildRequest("user:9", "project.deleted", "project:99", Outcome.SUCCESS),
                         AuditEventResponse.class)
@@ -153,6 +158,57 @@ class AuditEventIntegrationTest {
         assertThatThrownBy(() -> jdbcTemplate.update("DELETE FROM audit_events WHERE id = ?", created.getId()))
                 .hasMessageContaining("audit_events is append-only")
                 .hasMessageContaining("DELETE");
+    }
+
+    @Test
+    void get_unauthenticated_returns401() {
+        ResponseEntity<String> response = restTemplate.getForEntity("/audit-events", String.class);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void post_unauthenticated_returns401() {
+        CreateAuditEventRequest request = buildRequest("u:1", "login", "app:1", Outcome.SUCCESS);
+        ResponseEntity<String> response = restTemplate.postForEntity("/audit-events", request, String.class);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void get_emptyResult_returnsItemsAndNullCursor() throws Exception {
+        ResponseEntity<String> response = authed.getForEntity("/audit-events", String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        JsonNode body = new ObjectMapper().readTree(response.getBody());
+        assertThat(body.has("items")).isTrue();
+        assertThat(body.get("items").isArray()).isTrue();
+        assertThat(body.get("items")).isEmpty();
+        assertThat(body.has("nextCursor")).isTrue();
+        assertThat(body.get("nextCursor").isNull()).isTrue();
+    }
+
+    @Test
+    void get_returnsFlatItemShape() throws Exception {
+        authed.postForEntity(
+                "/audit-events",
+                buildRequest("user:42", "order.refunded", "order/9f3b", Outcome.SUCCESS),
+                AuditEventResponse.class);
+
+        ResponseEntity<String> response = authed.getForEntity("/audit-events", String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        JsonNode body = new ObjectMapper().readTree(response.getBody());
+        assertThat(body.get("items")).hasSize(1);
+        JsonNode item = body.get("items").get(0);
+        assertThat(item.has("id")).isTrue();
+        assertThat(item.has("timestamp")).isTrue();
+        assertThat(item.get("actor").asText()).isEqualTo("user:42");
+        assertThat(item.get("action").asText()).isEqualTo("order.refunded");
+        assertThat(item.get("resource").asText()).isEqualTo("order/9f3b");
+        assertThat(item.get("outcome").asText()).isEqualTo("success");
+        assertThat(item.has("context")).isTrue();
+        assertThat(item.has("prevHash")).isFalse();
+        assertThat(item.has("eventHash")).isFalse();
+        assertThat(body.get("nextCursor").isNull()).isTrue();
     }
 
     private CreateAuditEventRequest buildRequest(String actor, String action, String resource, Outcome outcome) {

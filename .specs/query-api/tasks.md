@@ -125,7 +125,7 @@ Spec wins. For each existing class touched by this work:
     - Delete `AuditEventService.search(...)` and its private `buildSpec(...)` from `domain/AuditEventService.java`. Strip the now-dead JPA imports (`Predicate`, `Page`, `PageRequest`, `Sort`, `Specification`). Keep `create(...)` untouched.
     - Add a `Clock` bean (e.g. in a `@Configuration` class) and inject it here — required by task 9 for deterministic seeding.
 
-- [~] **6. Add GET /audit-events controller**
+- [x] **6. Add GET /audit-events controller**
   - **Refs:** [design.md#endpoint](./design.md#endpoint), [design.md#auth](./design.md#auth), AC-R1, AC-R2
   - **Depends on:** 5
   - **Scope:**

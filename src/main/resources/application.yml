@@ -11,6 +11,11 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+  security:
+    user:
+      name: ${AUDIT_API_USER:audit}
+      password: ${AUDIT_API_PASSWORD:audit}
+      roles: AUDIT_READER,AUDIT_WRITER
 
 audit:
   retention:
