@@ -8,7 +8,6 @@ import java.time.Instant;
 import java.util.Map;
 import kirill.ked.auditlog.api.AuditEventResponse;
 import kirill.ked.auditlog.api.CreateAuditEventRequest;
-import kirill.ked.auditlog.api.PagedResponse;
 import kirill.ked.auditlog.domain.Outcome;
 import kirill.ked.auditlog.hashchain.HashChainService;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,7 +15,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -59,7 +57,7 @@ class AuditEventIntegrationTest {
     }
 
     @Test
-    void postAndGet_happyPath() {
+    void post_happyPath() {
         CreateAuditEventRequest request = buildRequest("user:42", "project.updated", "project:17", Outcome.SUCCESS);
 
         ResponseEntity<AuditEventResponse> postResponse =
@@ -71,14 +69,6 @@ class AuditEventIntegrationTest {
         assertThat(created.getId()).isNotNull();
         assertThat(created.getTimestamp()).isNotNull();
         assertThat(created.getActor()).isEqualTo("user:42");
-        assertThat(created.getEventHash()).isNotBlank();
-
-        ResponseEntity<PagedResponse<AuditEventResponse>> getResponse =
-                restTemplate.exchange("/audit-events", HttpMethod.GET, null, new ParameterizedTypeReference<>() {});
-
-        assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(getResponse.getBody().getContent()).hasSize(1);
-        assertThat(getResponse.getBody().getTotalElements()).isEqualTo(1);
     }
 
     @Test
@@ -118,25 +108,6 @@ class AuditEventIntegrationTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).containsKey("error");
-    }
-
-    @Test
-    void pagination_secondPage() {
-        for (int i = 0; i < 120; i++) {
-            restTemplate.postForEntity(
-                    "/audit-events",
-                    buildRequest("user:" + i, "action", "resource:1", Outcome.SUCCESS),
-                    AuditEventResponse.class);
-        }
-
-        ResponseEntity<PagedResponse<AuditEventResponse>> response = restTemplate.exchange(
-                "/audit-events?page=1&size=50", HttpMethod.GET, null, new ParameterizedTypeReference<>() {});
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        PagedResponse<AuditEventResponse> body = response.getBody();
-        assertThat(body.getContent()).hasSize(50);
-        assertThat(body.getTotalElements()).isEqualTo(120);
-        assertThat(body.getPage()).isEqualTo(1);
     }
 
     @Test

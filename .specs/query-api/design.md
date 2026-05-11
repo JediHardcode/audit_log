@@ -21,8 +21,9 @@ desc.
 
 ### Identifiers
 
-- `id` type: **ULID** (26-char Crockford base32, lexicographically sortable).
-  Stable tiebreaker for events sharing same `timestamp`.
+- `id` type: **UUID** (existing column type). UUIDs sort lexicographically and
+  provide a stable tiebreaker for events sharing the same `timestamp`. ULID
+  migration is out of scope — write path remains untouched.
 
 ### Response
 
@@ -30,7 +31,7 @@ desc.
 {
   "items": [
     {
-      "id": "01HE...Z9",
+      "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
       "timestamp": "2026-04-17T11:02:14Z",
       "actor": "u_42",
       "action": "order.refunded",
@@ -51,7 +52,7 @@ desc.
 
 ### Pagination
 
-- Cursor is opaque base64 (URL-safe, no padding) of JSON `{"ts":"<ISO>","id":"<ULID>","s":"asc|desc","f":"<sha256-hex of filters>"}`.
+- Cursor is opaque base64 (URL-safe, no padding) of JSON `{"ts":"<ISO>","id":"<UUID>","s":"asc|desc","f":"<sha256-hex of filters>"}`.
   Clients must not parse it.
 - Stable sort: `timestamp` then `id` as tiebreaker.
 - Direction follows `sort` param.

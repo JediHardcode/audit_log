@@ -9,6 +9,10 @@ import lombok.Builder;
 import lombok.Value;
 import lombok.extern.jackson.Jacksonized;
 
+/**
+ * Single audit event item exposed by the public API. Hash chain fields ({@code prevHash},
+ * {@code eventHash}) are deliberately omitted — tamper-evidence is an internal concern.
+ */
 @Value
 @Builder
 @Jacksonized
@@ -21,8 +25,6 @@ public class AuditEventResponse {
     String resource;
     Outcome outcome;
     Map<String, Object> context;
-    String prevHash;
-    String eventHash;
 
     public static AuditEventResponse from(AuditEventEntity entity) {
         return AuditEventResponse.builder()
@@ -33,8 +35,6 @@ public class AuditEventResponse {
                 .resource(entity.getResource())
                 .outcome(entity.getOutcome())
                 .context(entity.getContext())
-                .prevHash(entity.getPrevHash())
-                .eventHash(entity.getEventHash())
                 .build();
     }
 }

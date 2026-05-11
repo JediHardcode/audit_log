@@ -3,15 +3,10 @@ package kirill.ked.auditlog.persistence;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.domain.Specification;
-import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 
-public interface AuditEventRepository
-        extends Repository<AuditEventEntity, UUID>, JpaSpecificationExecutor<AuditEventEntity> {
+public interface AuditEventRepository extends Repository<AuditEventEntity, UUID> {
 
     AuditEventEntity save(AuditEventEntity entity);
 
@@ -24,8 +19,6 @@ public interface AuditEventRepository
     /** Acquires a session-level advisory lock to serialize concurrent inserts. */
     @Query(value = "SELECT pg_advisory_xact_lock(7483921)", nativeQuery = true)
     void acquireInsertLock();
-
-    Page<AuditEventEntity> findAll(Specification<AuditEventEntity> spec, Pageable pageable);
 
     /** Returns all events in chronological order for chain verification. */
     @Query(value = "SELECT * FROM audit_events ORDER BY timestamp ASC, id ASC", nativeQuery = true)
