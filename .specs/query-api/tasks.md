@@ -53,7 +53,7 @@ Spec wins. For each existing class touched by this work:
 
 ## Tasks
 
-- [~] **1. Add query API response and request types**
+- [x] **1. Add query API response and request types**
   - **Refs:** [requirements.md#response-shape](./requirements.md#response-shape), [design.md#layering--classes](./design.md#layering--classes)
   - **Depends on:** none
   - **Scope:**
@@ -70,7 +70,7 @@ Spec wins. For each existing class touched by this work:
     - Add new `AuditEventQuery` (request POJO with `@Builder`).
     - Update `design.md` `### Identifiers` from ULID to UUID (resolves the id-type conflict — see disposition #9).
 
-- [~] **2. Add read repository for audit event queries**
+- [x] **2. Add read repository for audit event queries**
   - **Refs:** [design.md#layering--classes](./design.md#layering--classes), [design.md#resource-prefix-matching](./design.md#resource-prefix-matching), AC-F1..AC-F7, AC-P1, AC-P2
   - **Depends on:** 1
   - **Scope:**
@@ -85,7 +85,7 @@ Spec wins. For each existing class touched by this work:
     - Delete `findAll(Specification, Pageable)` method from existing `AuditEventRepository` — only the write methods (`save`, `findById`, `findLatest`, `acquireInsertLock`, `findAllForChainVerification`) remain.
     - Do NOT touch `AuditEventEntity` — still used by write path.
 
-- [ ] **3. Add cursor encoding and validation**
+- [x] **3. Add cursor encoding and validation**
   - **Refs:** [design.md#pagination](./design.md#pagination), [design.md#cursor-invalidation](./design.md#cursor-invalidation), AC-E8, AC-E9, AC-E10
   - **Depends on:** 1
   - **Scope:**
@@ -97,7 +97,7 @@ Spec wins. For each existing class touched by this work:
     - Cursor is opaque — no field of the encoded payload leaks unparsed.
   - **Repo status:** nothing exists. Cursor `id` field encodes UUID as string (see disposition #9).
 
-- [~] **4. Add query validation**
+- [x] **4. Add query validation**
   - **Refs:** [design.md#validation--errors-all-400](./design.md#validation--errors-all-400), AC-E1..AC-E7, AC-P7, AC-P8
   - **Depends on:** 1
   - **Scope:**
@@ -111,7 +111,7 @@ Spec wins. For each existing class touched by this work:
     - `@Max(500)` on the current `size` param is gone after task 6 (param itself is removed). Do not carry it over to `limit` — clamp in code, do not reject.
     - From/to ISO parsing via Spring `@DateTimeFormat` already raises 400 through the existing handler — reuse mechanism for AC-E1.
 
-- [ ] **5. Add query service**
+- [x] **5. Add query service**
   - **Refs:** [design.md#layering--classes](./design.md#layering--classes), [design.md#timestamp-precision](./design.md#timestamp-precision), AC-P3, AC-P4, AC-P5
   - **Depends on:** 2, 3, 4
   - **Scope:**
