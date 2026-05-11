@@ -80,6 +80,7 @@ Success criteria:
 - Required indexes exist for `(timestamp DESC, id DESC)`, actor queries, resource prefix queries, and outcome queries.
 - Add a Flyway migration only for missing indexes.
 - No write-side storage behavior changes are introduced.
+- Integration test for indexes (by information_schema)
 
 ## 8. Add integration tests for filters and sorting
 
