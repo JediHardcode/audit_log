@@ -52,7 +52,7 @@ GET  /audit-events            — поиск по actor / resource / time range
 - Если что-то непонятно, перед выполнением задай вопросы
 - Если какая-то проблема возникла и спустя пару попыток не получилось решить, напиши в чат
 - Сенситив дата в .env и подтягивается через application.yml
-
+- перед коммитом - прогнать gradle spotless
 ## Architectural rules
 
 - Retention policy: хранение N дней, потом archival
