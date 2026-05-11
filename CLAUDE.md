@@ -9,7 +9,9 @@
 
 ```
 POST /audit-events            — принять одно событие
-GET  /audit-events            — поиск по actor / resource / time range
+GET  /audit-events            — поиск по actor / resource / time range / outcome,
+                                сортировка timestamp, cursor-пагинация
+                                (см. .specs/query-api/)
 ```
 
 ## Event model

@@ -207,7 +207,7 @@ Spec wins. For each existing class touched by this work:
     - AC-X1, AC-X2, AC-X3 each covered by named test.
   - **Repo status:** none. Depends on task 2 already using `LIKE ... ESCAPE '\'`.
 
-- [~] **12. Update API documentation**
+- [x] **12. Update API documentation**
   - **Refs:** [design.md#documentation-update](./design.md#documentation-update)
   - **Depends on:** 6
   - **Scope:**
