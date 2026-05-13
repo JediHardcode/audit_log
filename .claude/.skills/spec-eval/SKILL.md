@@ -67,5 +67,5 @@ If `SHIP`, the "Top fixes" section becomes "Optional improvements to reach 3/3/3
 
 - Do **not** edit the spec while evaluating. Read-only pass.
 - Do **not** score axes the user excluded via focus parameter.
-- Do **not** invent rubric levels — quote the definitions from `.specs/_eval-checklist.md`.
+- Do **not** invent rubric levels — quote the definitions from `references/_eval-checklist.md`.
 - If the spec is split across multiple files and a file is missing (e.g. no `tasks.md`), score decomposition based on what exists and note the missing file as evidence for the score.
