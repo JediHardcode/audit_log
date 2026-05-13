@@ -7,7 +7,7 @@
 
 | Param    | Type                              | Required | Semantics                                          |
 |----------|-----------------------------------|----------|----------------------------------------------------|
-| actor    | string                            | no       | Exact match                                        |
+| actor    | string (comma-separated, ≤10)     | no       | Exact match; multi-value = OR. See `### Multi-actor filter` |
 | resource | string                            | no       | Prefix match (e.g. `order/` returns all `order/*`) |
 | from     | ISO-8601 instant (UTC)            | no       | Inclusive lower bound on `timestamp`               |
 | to       | ISO-8601 instant (UTC)            | no       | Exclusive upper bound on `timestamp`               |
@@ -69,10 +69,45 @@ desc.
 - If incoming request has different `sort` or filter hash → **400 invalid cursor**.
 - No HMAC signing (internal service, trusted callers); tampering yields 400 on parse or hash mismatch.
 
+##### Filter hash canonical form
+
+SHA-256 hex over the following byte sequence, fields in fixed order, `\n` (LF, 0x0A) separator. Missing values serialized as empty string. Single newline between fields, no trailing newline:
+
+```
+actor      := normalized actor set, elements joined by ',' (comma). See `### Multi-actor filter` for normalization.
+resource   := raw user input (pre-LIKE-escape, post-trim of leading/trailing whitespace)
+from       := ISO-8601 instant truncated to microseconds, or ""
+to         := ISO-8601 instant truncated to microseconds, or ""
+outcome    := lowercase enum literal, or ""
+
+input      := actor + "\n" + resource + "\n" + from + "\n" + to + "\n" + outcome
+hash       := lower-hex(SHA-256(UTF-8(input)))
+```
+
+Two requests producing identical normalized inputs MUST yield byte-identical hashes. Examples:
+
+- `actor=u_42,svc_billing` and `actor=svc_billing,u_42` → same hash (sort stage).
+- `actor=u_42,,u_42` and `actor=u_42` → same hash (blank-strip + dedup).
+- `actor=U_42` and `actor=u_42` → **different** hash (case-sensitive).
+
 #### Timestamp precision
 
 - Postgres `timestamptz` stores microseconds; Java `Instant` carries nanoseconds.
 - All timestamps truncated to **microseconds** before write, comparison, and cursor encoding to avoid boundary mismatches.
+
+### Multi-actor filter
+
+- `actor` query param accepts a comma-separated list (`actor=u_42,svc_billing`).
+- Single value remains backward-compatible — same wire format, same SQL path.
+- Normalization pipeline (applied identically by validator, repository, and cursor hash):
+  1. Split on `,`.
+  2. Trim each value; drop blanks.
+  3. Deduplicate (set semantics).
+  4. Sort ascending by Java `String.compareTo` (UTF-16 code unit order, case-sensitive).
+- Cap: > 10 distinct non-blank values → **400** (parse error).
+- Empty effective set (e.g. `actor=,,`) → no actor filter applied.
+- SQL: `actor = ANY(:actors)` bound as `text[]`. With one element, planner falls back to equality — same plan as the scalar case.
+- Index path: existing `(actor, timestamp DESC, id DESC)` composite serves each element via BitmapOr; no new index required for the 10-element cap.
 
 ### Resource prefix matching
 
