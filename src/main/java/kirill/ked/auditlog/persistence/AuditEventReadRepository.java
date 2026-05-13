@@ -45,7 +45,7 @@ public class AuditEventReadRepository {
      * <p>{@code from} is inclusive, {@code to} is exclusive.
      */
     public List<AuditEventResponse> search(
-            String actor,
+            List<String> actors,
             String resourcePrefix,
             Instant from,
             Instant to,
@@ -57,9 +57,9 @@ public class AuditEventReadRepository {
         StringBuilder sql = new StringBuilder(BASE_SQL).append(" WHERE 1=1");
         MapSqlParameterSource params = new MapSqlParameterSource();
 
-        if (actor != null) {
-            sql.append(" AND actor = :actor");
-            params.addValue("actor", actor);
+        if (actors != null && !actors.isEmpty()) {
+            sql.append(" AND actor IN (:actors)");
+            params.addValue("actors", actors);
         }
         if (resourcePrefix != null) {
             sql.append(" AND resource LIKE :resourcePrefix || '%' ESCAPE '\\'");

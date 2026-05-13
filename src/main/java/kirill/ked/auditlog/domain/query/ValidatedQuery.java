@@ -1,6 +1,7 @@
 package kirill.ked.auditlog.domain.query;
 
 import java.time.Instant;
+import java.util.List;
 import kirill.ked.auditlog.domain.Outcome;
 import lombok.Builder;
 import lombok.Value;
@@ -14,7 +15,7 @@ import lombok.Value;
 @Builder
 public class ValidatedQuery {
 
-    String actor;
+    List<String> actors;
     String resource;
     Instant from;
     Instant to;

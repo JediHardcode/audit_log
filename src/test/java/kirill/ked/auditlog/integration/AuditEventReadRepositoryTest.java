@@ -53,10 +53,23 @@ class AuditEventReadRepositoryTest {
         seed(base.plusSeconds(1), "bob", "order/2", Outcome.SUCCESS);
 
         List<AuditEventResponse> rows =
-                readRepository.search("alice", null, null, null, null, SortDirection.DESC, null, null, 10);
+                readRepository.search(List.of("alice"), null, null, null, null, SortDirection.DESC, null, null, 10);
 
         assertThat(rows).hasSize(1);
         assertThat(rows.get(0).getActor()).isEqualTo("alice");
+    }
+
+    @Test
+    void search_byActors_returnsAnyMatchingActor() {
+        Instant base = Instant.parse("2026-04-01T10:00:00Z");
+        seed(base, "alice", "order/1", Outcome.SUCCESS);
+        seed(base.plusSeconds(1), "bob", "order/2", Outcome.SUCCESS);
+        seed(base.plusSeconds(2), "carol", "order/3", Outcome.SUCCESS);
+
+        List<AuditEventResponse> rows = readRepository.search(
+                List.of("alice", "bob"), null, null, null, null, SortDirection.ASC, null, null, 10);
+
+        assertThat(rows).extracting(AuditEventResponse::getActor).containsExactly("alice", "bob");
     }
 
     @Test
@@ -67,7 +80,7 @@ class AuditEventReadRepositoryTest {
         seed(base.plusSeconds(2), "alice", "invoice/9", Outcome.SUCCESS);
 
         List<AuditEventResponse> rows =
-                readRepository.search(null, "order/", null, null, null, SortDirection.ASC, null, null, 10);
+                readRepository.search(List.of(), "order/", null, null, null, SortDirection.ASC, null, null, 10);
 
         assertThat(rows).extracting(AuditEventResponse::getResource).containsExactly("order/1", "order/2");
     }
@@ -83,7 +96,7 @@ class AuditEventReadRepositoryTest {
         seed(t3, "c", "r", Outcome.SUCCESS);
 
         List<AuditEventResponse> rows =
-                readRepository.search(null, null, t1, t3, null, SortDirection.ASC, null, null, 10);
+                readRepository.search(List.of(), null, t1, t3, null, SortDirection.ASC, null, null, 10);
 
         assertThat(rows).extracting(AuditEventResponse::getActor).containsExactly("a", "b");
     }
@@ -96,7 +109,7 @@ class AuditEventReadRepositoryTest {
         seed(base.plusSeconds(2), "c", "r", Outcome.ERROR);
 
         List<AuditEventResponse> rows =
-                readRepository.search(null, null, null, null, Outcome.DENIED, SortDirection.DESC, null, null, 10);
+                readRepository.search(List.of(), null, null, null, Outcome.DENIED, SortDirection.DESC, null, null, 10);
 
         assertThat(rows).hasSize(1);
         assertThat(rows.get(0).getOutcome()).isEqualTo(Outcome.DENIED);
@@ -111,7 +124,7 @@ class AuditEventReadRepositoryTest {
         seedWithId(id1, t, "b", "r", Outcome.SUCCESS);
 
         List<AuditEventResponse> rows =
-                readRepository.search(null, null, null, null, null, SortDirection.ASC, null, null, 10);
+                readRepository.search(List.of(), null, null, null, null, SortDirection.ASC, null, null, 10);
 
         assertThat(rows).extracting(AuditEventResponse::getId).containsExactly(id1, id2);
     }
@@ -125,7 +138,7 @@ class AuditEventReadRepositoryTest {
         seedWithId(id1, t, "b", "r", Outcome.SUCCESS);
 
         List<AuditEventResponse> rows =
-                readRepository.search(null, null, null, null, null, SortDirection.DESC, null, null, 10);
+                readRepository.search(List.of(), null, null, null, null, SortDirection.DESC, null, null, 10);
 
         assertThat(rows).extracting(AuditEventResponse::getId).containsExactly(id2, id1);
     }

@@ -3,6 +3,8 @@ package kirill.ked.auditlog.domain.query;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
+import java.util.List;
 import kirill.ked.auditlog.api.AuditEventQuery;
 import kirill.ked.auditlog.domain.Outcome;
 import org.springframework.stereotype.Component;
@@ -26,6 +28,7 @@ public class QueryValidator {
 
     private static final int DEFAULT_LIMIT = 50;
     private static final int MAX_LIMIT = 200;
+    private static final int MAX_ACTORS = 10;
     private static final Duration MAX_WINDOW = Duration.ofDays(90);
 
     public ValidatedQuery validate(AuditEventQuery raw) {
@@ -46,7 +49,7 @@ public class QueryValidator {
         int limit = parseLimit(raw.getLimitRaw());
 
         return ValidatedQuery.builder()
-                .actor(blankToNull(raw.getActor()))
+                .actors(parseActors(raw.getActor()))
                 .resource(blankToNull(raw.getResource()))
                 .from(from)
                 .to(to)
@@ -55,6 +58,22 @@ public class QueryValidator {
                 .limit(limit)
                 .cursor(blankToNull(raw.getCursor()))
                 .build();
+    }
+
+    private List<String> parseActors(String raw) {
+        if (raw == null) {
+            return List.of();
+        }
+        List<String> actors = Arrays.stream(raw.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .distinct()
+                .sorted()
+                .toList();
+        if (actors.size() > MAX_ACTORS) {
+            throw new InvalidQueryException("too_many_actors", "actor filter supports at most 10 values");
+        }
+        return actors;
     }
 
     private Instant truncate(Instant ts) {

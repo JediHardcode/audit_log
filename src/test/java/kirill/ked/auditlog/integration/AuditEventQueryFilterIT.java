@@ -77,6 +77,48 @@ class AuditEventQueryFilterIT {
         items.forEach(i -> assertThat(i.get("actor").asText()).isEqualTo("u_42"));
     }
 
+    /** AC-F1a — comma-separated actor values match any listed actor. */
+    @Test
+    void actorFilter_multipleActors_returnsOnlyMatchingActors() throws Exception {
+        seed("u_42", "login", "app:1", "SUCCESS", Instant.parse("2026-05-01T10:00:00Z"));
+        seed("svc_billing", "charge", "app:1", "SUCCESS", Instant.parse("2026-05-01T11:00:00Z"));
+        seed("u_99", "login", "app:1", "SUCCESS", Instant.parse("2026-05-01T12:00:00Z"));
+
+        JsonNode items = items(get("/audit-events?actor=u_42,svc_billing"));
+
+        assertThat(items).hasSize(2);
+        assertThat(items).extracting(i -> i.get("actor").asText()).containsOnly("u_42", "svc_billing");
+    }
+
+    /** AC-F1b — duplicate actor values are collapsed by validation. */
+    @Test
+    void actorFilter_duplicateActors_doNotDuplicateRows() throws Exception {
+        seed("u_42", "login", "app:1", "SUCCESS", Instant.parse("2026-05-01T10:00:00Z"));
+        seed("u_42", "logout", "app:1", "SUCCESS", Instant.parse("2026-05-01T11:00:00Z"));
+        seed("u_99", "login", "app:1", "SUCCESS", Instant.parse("2026-05-01T12:00:00Z"));
+
+        JsonNode items = items(get("/audit-events?actor=u_42,u_42"));
+
+        assertThat(items).hasSize(2);
+        items.forEach(i -> assertThat(i.get("actor").asText()).isEqualTo("u_42"));
+    }
+
+    /** AC-F1c + AC-E9 — same actor set in different order can reuse a cursor. */
+    @Test
+    void actorFilter_sameActorSetDifferentOrder_reusesCursor() throws Exception {
+        seed("a", "x", "r", "SUCCESS", Instant.parse("2026-05-01T10:00:00Z"));
+        seed("b", "x", "r", "SUCCESS", Instant.parse("2026-05-01T11:00:00Z"));
+        seed("a", "x", "r", "SUCCESS", Instant.parse("2026-05-01T12:00:00Z"));
+
+        JsonNode page1 = mapper.readTree(get("/audit-events?actor=a,b&limit=1").getBody());
+        String cursor = page1.get("nextCursor").asText();
+
+        JsonNode page2 = items(get("/audit-events?actor=b,a&limit=2&cursor=" + cursor));
+
+        assertThat(page2).hasSize(2);
+        assertThat(page2).extracting(i -> i.get("actor").asText()).containsOnly("a", "b");
+    }
+
     /** AC-F2 — resource prefix match. */
     @Test
     void resourcePrefix_returnsAllChildren() throws Exception {

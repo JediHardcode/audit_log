@@ -36,7 +36,7 @@ public class AuditEventQueryService {
         ValidatedQuery query = validator.validate(raw);
 
         String filterHash = FilterHash.compute(
-                query.getActor(), query.getResource(), query.getFrom(), query.getTo(), query.getOutcome());
+                query.getActors(), query.getResource(), query.getFrom(), query.getTo(), query.getOutcome());
 
         Cursor cursor = null;
         if (query.getCursor() != null) {
@@ -52,7 +52,7 @@ public class AuditEventQueryService {
         String resourcePrefix = LikePrefix.escape(query.getResource());
 
         List<AuditEventResponse> rows = readRepository.search(
-                query.getActor(),
+                query.getActors(),
                 resourcePrefix,
                 query.getFrom(),
                 query.getTo(),

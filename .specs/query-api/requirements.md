@@ -7,9 +7,9 @@ or schema changes.
 
 ## Goal
 
-A single HTTP endpoint that lets internal callers search audit events by
-`actor`, `resource`, time range, and `outcome`, returning results in stable
-order with cursor-based pagination.
+A single HTTP endpoint that lets internal callers search audit events by one or
+more `actor` values, `resource`, time range, and `outcome`, returning results in
+stable order with cursor-based pagination.
 
 `nextCursor = null` means no more pages. Field names match the event model in
 `CLAUDE.md` (`timestamp`, `context`) — not renamed.
@@ -27,6 +27,10 @@ EARS form: `WHEN <trigger> THEN <observable outcome>`.
 ### Filtering
 
 - **AC-F1** WHEN client sends `GET /audit-events?actor=u_42` THEN response 200 contains only items where `actor == "u_42"`.
+- **AC-F1a** WHEN client sends `GET /audit-events?actor=u_42,svc_billing` THEN response 200 contains only items where `actor` is either `"u_42"` or `"svc_billing"`.
+- **AC-F1b** WHEN client sends comma-separated `actor` values with duplicates THEN duplicated values do not change the result set or cursor filter identity.
+- **AC-F1c** WHEN client sends comma-separated `actor` values in different order THEN the effective filter is the same actor set and compatible cursors remain valid.
+- **AC-F1d** WHEN client sends up to 10 distinct non-blank comma-separated `actor` values THEN response 200 applies all of them as the actor filter.
 - **AC-F2** WHEN client sends `GET /audit-events?resource=order/` THEN response 200 contains only items where `resource` starts with literal `order/`.
 - **AC-F3** WHEN client sends `GET /audit-events?from=T1&to=T2` THEN response 200 contains only items where `T1 <= timestamp < T2` (lower inclusive, upper exclusive).
 - **AC-F4** WHEN event row has `timestamp == T1` AND request uses `from=T1` THEN that row is included.
@@ -55,8 +59,9 @@ EARS form: `WHEN <trigger> THEN <observable outcome>`.
 - **AC-E6** WHEN both `from` and `to` set AND `to - from > 90 days` THEN response is 400.
 - **AC-E7** WHEN only `from` set OR only `to` set THEN 90-day window check is skipped (no 400).
 - **AC-E8** WHEN `cursor` is unparseable (bad base64 or bad JSON) THEN response is 400.
-- **AC-E9** WHEN `cursor` filter hash differs from current request filter hash THEN response is 400.
+- **AC-E9** WHEN `cursor` filter hash differs from current request filter hash, including a different effective actor set, THEN response is 400.
 - **AC-E10** WHEN `cursor` `sort` differs from current request `sort` THEN response is 400.
+- **AC-E11** WHEN client sends more than 10 distinct non-blank comma-separated `actor` values THEN response is 400.
 
 ### Resource prefix escaping
 
@@ -72,6 +77,15 @@ EARS form: `WHEN <trigger> THEN <observable outcome>`.
 ### Test coverage requirement
 
 All ACs above must be covered by integration tests using Testcontainers with real Postgres. No DB mocks.
+
+### Multi-actor semantics
+
+- The existing `actor` query parameter is extended from single value to comma-separated list semantics: `actor=u_42,svc_billing`.
+- One `actor` value remains backward-compatible and behaves exactly as before.
+- Multiple actor values are an OR filter over exact actor strings.
+- Effective actor set is parsed by splitting `actor` on comma, then normalized before validation, repository query, and cursor filter hash: blank values are ignored, duplicates are removed, and remaining values are sorted for stable cursor identity.
+- Maximum actor filter size is 10 distinct non-blank values per request.
+- If no non-blank actor values remain, no actor filter is applied.
 
 ## Out of scope
 
