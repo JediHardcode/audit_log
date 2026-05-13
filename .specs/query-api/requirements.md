@@ -36,14 +36,3 @@ order with cursor-based pagination.
 ### Test coverage requirement
 
 All ACs above must be covered by integration tests using Testcontainers with real Postgres. No DB mocks.
-
-## Out of scope
-
-- Observability: metrics, access logs (separate ticket)
-- Any change to POST /audit-events, event model, or storage schema
-- Field renames (`occurredAt`, `payload`) — keep event-model names
-- Nested `actor` / `resource` objects with `type` — keep flat strings
-
-## Open questions
-
-(none — resolved in design Q&A on 2026-05-06)
