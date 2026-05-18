@@ -32,6 +32,7 @@ If the path is missing or ambiguous, ask the user before scoring.
 4. **Compute verdict.** `SHIP` if every axis ≥ 2. Otherwise `BLOCK`.
 5. **List top fixes.** 1–3 concrete edits that would raise the lowest axis by one level. Each fix names the file and what to add/change.
 6. **Output.** Use the exact format below. Do not add prose outside it.
+7. **Write the report.** Save the output to `.specs/<feature>/review.md` (overwrite any previous one), then also print it to the chat. The spec-eval gate hook reads this file: for a `.specs` change to land, `review.md` must exist, be newer than the spec files, and carry a `SHIP` verdict.
 
 ## Scoring guidance (anti-grade-inflation)
 
@@ -65,7 +66,7 @@ If `SHIP`, the "Top fixes" section becomes "Optional improvements to reach 3/3/3
 
 ## Boundaries
 
-- Do **not** edit the spec while evaluating. Read-only pass.
+- Do **not** edit the spec (`requirements.md` / `design.md` / `tasks.md`) while evaluating. Read-only pass. Writing the sibling `review.md` report is expected and not a spec edit.
 - Do **not** score axes the user excluded via focus parameter.
 - Do **not** invent rubric levels — quote the definitions from `references/_eval-checklist.md`.
 - If the spec is split across multiple files and a file is missing (e.g. no `tasks.md`), score decomposition based on what exists and note the missing file as evidence for the score.

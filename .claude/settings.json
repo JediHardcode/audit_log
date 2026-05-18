@@ -20,7 +20,7 @@
             "type": "command",
             "command": "python3 .agents/hooks/spec_eval_gate.py claude-stop",
             "timeout": 120,
-            "statusMessage": "Running .claude/.skills/spec-eval"
+            "statusMessage": "Checking spec-eval gate"
           }
         ]
       }

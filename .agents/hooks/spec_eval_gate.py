@@ -1,5 +1,20 @@
 #!/usr/bin/env python3
-"""Shared spec-eval lifecycle hook for Codex, Claude Code, and compatible agents."""
+"""Spec-eval lifecycle gate for Claude Code, Codex, and compatible agents.
+
+Two-stage gate for changes under `.specs/`:
+
+1. PostToolUse (`track` mode) records which `.specs/<feature>` folders a turn
+   touched.
+2. Stop (`stop` mode) gates the turn. For every touched feature it runs a
+   cheap, deterministic structural pre-check, then requires a fresh spec-eval
+   report (`.specs/<feature>/review.md`) with a `SHIP` verdict. Anything else
+   blocks the turn and tells the agent to run the `spec-eval` skill.
+
+The hook never scores the spec itself — scoring is the skill's job. The hook
+only checks that the skill ran, ran *after* the latest spec edit, and shipped.
+The agent's escape hatch is always the same: run the spec-eval skill, which
+writes a fresh `review.md`.
+"""
 
 from __future__ import annotations
 
@@ -17,7 +32,12 @@ from typing import Any
 STATE_ROOT = Path(tempfile.gettempdir()) / "agent-spec-eval-hooks"
 SPEC_PATH_RE = re.compile(r"(?:^|[\s\"'=:])((?:[A-Za-z]:)?/?[^\s\"']*?\.specs/([^/\s\"']+)/[^\s\"']+)")
 TOKEN_RE = re.compile(r"[^A-Za-z0-9_.-]+")
+VERDICT_RE = re.compile(r"verdict\b.{0,16}?\b(SHIP|BLOCK)\b", re.IGNORECASE)
+REASON_RE = re.compile(r"reason\b.{0,4}?:?\**\s*(.+)", re.IGNORECASE)
+
 SKILL_REL_PATH = Path(".claude/.skills/spec-eval")
+SPEC_FILES = ("requirements.md", "design.md", "tasks.md")
+REVIEW_FILE = "review.md"
 
 
 def read_hook_input() -> dict[str, Any]:
@@ -43,10 +63,6 @@ def state_file(root: Path, payload: dict[str, Any]) -> Path:
     return STATE_ROOT / f"{repo_hash}-{TOKEN_RE.sub('_', session_id)[:96]}.json"
 
 
-def report_dir(root: Path, payload: dict[str, Any]) -> Path:
-    return state_file(root, payload).with_suffix("")
-
-
 def iter_strings(value: Any) -> list[str]:
     if isinstance(value, str):
         return [value]
@@ -65,6 +81,7 @@ def iter_strings(value: Any) -> list[str]:
 
 
 def touched_features(payload: dict[str, Any]) -> set[str]:
+    """Extract every `.specs/<feature>` folder name mentioned in the payload."""
     haystacks = iter_strings(payload)
     haystacks.append(json.dumps(payload, ensure_ascii=False, default=str))
     features: set[str] = set()
@@ -91,126 +108,63 @@ def save_state(path: Path, features: set[str]) -> None:
 
 
 def clear_state(root: Path, payload: dict[str, Any]) -> None:
-    for target in [state_file(root, payload), report_dir(root, payload)]:
-        if target.is_file():
-            target.unlink(missing_ok=True)
-        elif target.is_dir():
-            for child in target.glob("*"):
-                if child.is_file():
-                    child.unlink(missing_ok=True)
-            target.rmdir()
+    state_file(root, payload).unlink(missing_ok=True)
 
 
-def read_file(path: Path) -> tuple[str, list[str]]:
-    if not path.exists():
-        return "", []
-    text = path.read_text(encoding="utf-8", errors="replace")
-    return text, text.splitlines()
+def evaluate_feature(root: Path, feature: str) -> list[str]:
+    """Gate one feature. Return blocking reasons; empty list means SHIP.
 
-
-def first_line(lines: list[str], pattern: str) -> str | None:
-    regex = re.compile(pattern, re.IGNORECASE)
-    for idx, line in enumerate(lines, start=1):
-        if regex.search(line):
-            return f"L{idx}: {line.strip()[:160]}"
-    return None
-
-
-def has_any(text: str, patterns: list[str]) -> bool:
-    return any(re.search(pattern, text, re.IGNORECASE | re.MULTILINE) for pattern in patterns)
-
-
-def add_result(rows: list[tuple[str, str, str]], fails: list[str], status: str, axis: str, detail: str) -> None:
-    rows.append((status, axis, detail))
-    if status == "FAIL":
-        fails.append(f"[FAIL] {axis}: {detail}")
-
-
-def evaluate_feature(root: Path, feature: str) -> tuple[str, list[str]]:
-    skill_dir = root / SKILL_REL_PATH
-    repo_rubric = root / ".specs/_eval-checklist.md"
-    skill_ref_rubric = skill_dir / "references/_eval-checklist.md"
+    Stage 1 — structural pre-check (cheap, deterministic): the spec folder must
+    contain non-empty spec files. Stage 2 — the spec-eval skill must have run:
+    `review.md` must exist, be newer than every spec file, and read `SHIP`.
+    """
     spec_dir = root / ".specs" / feature
+    run_hint = f"run the spec-eval skill on .specs/{feature} (it writes .specs/{feature}/{REVIEW_FILE})"
 
-    req_text, req_lines = read_file(spec_dir / "requirements.md")
-    design_text, design_lines = read_file(spec_dir / "design.md")
-    tasks_text, tasks_lines = read_file(spec_dir / "tasks.md")
+    if not spec_dir.is_dir():
+        return [f".specs/{feature}: folder does not exist"]
 
-    rows: list[tuple[str, str, str]] = []
-    fails: list[str] = []
+    # Stage 1 — structural pre-check.
+    present: list[str] = []
+    for name in SPEC_FILES:
+        path = spec_dir / name
+        if not path.is_file():
+            continue
+        if not path.read_text(encoding="utf-8", errors="replace").strip():
+            return [f".specs/{feature}: {name} is empty — fill it in, then {run_hint}"]
+        present.append(name)
+    if not present:
+        return [f".specs/{feature}: no spec files ({', '.join(SPEC_FILES)}) — write the spec, then {run_hint}"]
 
-    if not (skill_dir / "SKILL.md").exists():
-        add_result(rows, fails, "FAIL", "Skill setup", f"missing {SKILL_REL_PATH}/SKILL.md")
-    if not repo_rubric.exists() and not skill_ref_rubric.exists():
-        add_result(rows, fails, "FAIL", "Skill setup", "missing spec-eval rubric")
+    # Stage 2 — require a fresh spec-eval report.
+    review = spec_dir / REVIEW_FILE
+    if not review.is_file():
+        return [f".specs/{feature}: no spec-eval report — {run_hint}"]
 
-    ac_heading = first_line(req_lines, r"acceptance criteria|criteria|акцепт|при[её]м")
-    testable_cue = first_line(
-        req_lines,
-        r"\b(WHEN|IF|WHILE|GIVEN|THEN|MUST|SHALL)\b|returns?|status|HTTP|200|400|only|sorted|cursor|limit|error",
-    )
-    if not req_text:
-        add_result(rows, fails, "FAIL", "Testability", "missing requirements.md")
-    elif not ac_heading:
-        add_result(rows, fails, "FAIL", "Testability", "requirements.md has no acceptance-criteria section")
-    elif not testable_cue:
-        add_result(rows, fails, "FAIL", "Testability", "acceptance criteria lack binary pass/fail cues")
-    else:
-        add_result(rows, fails, "PASS", "Testability", f"{ac_heading}; {testable_cue}")
+    review_mtime = review.stat().st_mtime
+    newest_spec = max((spec_dir / n).stat().st_mtime for n in present)
+    if review_mtime < newest_spec:
+        return [f".specs/{feature}: {REVIEW_FILE} is stale (spec edited after last eval) — re-{run_hint}"]
 
-    missing_design = []
-    if not has_any(design_text, [r"sort|order|timestamp"]):
-        missing_design.append("sort order")
-    if not has_any(design_text, [r"tie[- ]?break|tiebreak|secondary|id\b"]):
-        missing_design.append("tiebreaker")
-    if not has_any(design_text, [r"cursor|pagination|page size|limit"]):
-        missing_design.append("pagination contract")
-    if not has_any(design_text, [r"status|HTTP|error response|problem\+json|4\d\d|5\d\d"]):
-        missing_design.append("error/status contract")
-    if not has_any(design_text, [r"index|indexes|индекс"]):
-        missing_design.append("index strategy")
-    if not design_text:
-        add_result(rows, fails, "FAIL", "Determinism", "missing design.md")
-    elif missing_design:
-        add_result(rows, fails, "FAIL", "Determinism", "missing " + ", ".join(missing_design))
-    else:
-        evidence = first_line(design_lines, r"sort|order|cursor|index|status|HTTP") or "contract cues present"
-        add_result(rows, fails, "PASS", "Determinism", evidence)
+    review_text = review.read_text(encoding="utf-8", errors="replace")
+    verdict_match = VERDICT_RE.search(review_text)
+    if not verdict_match:
+        return [f".specs/{feature}: {REVIEW_FILE} has no SHIP/BLOCK verdict — re-{run_hint}"]
 
-    missing_tasks = []
-    if not has_any(tasks_text, [r"^- \[ \]|^\d+\.|^##?\s+", r"task", r"задач"]):
-        missing_tasks.append("task list")
-    if not has_any(tasks_text, [r"requirements?\.md|design\.md|AC[- ]?\d+|REQ[- ]?\d+|R\d+|§|section"]):
-        missing_tasks.append("requirement/design references")
-    if not has_any(tasks_text, [r"Definition of Done|DoD|done when|acceptance|check|verify|test"]):
-        missing_tasks.append("definition of done")
-    if not has_any(tasks_text, [r"depends|dependency|after|blocked by|requires|завис"]):
-        missing_tasks.append("dependencies")
-    if not tasks_text:
-        add_result(rows, fails, "FAIL", "Decomposition", "missing tasks.md")
-    elif missing_tasks:
-        add_result(rows, fails, "FAIL", "Decomposition", "missing " + ", ".join(missing_tasks))
-    else:
-        evidence = first_line(tasks_lines, r"depends|DoD|Definition of Done|requirements?\.md|design\.md") or "task cues present"
-        add_result(rows, fails, "PASS", "Decomposition", evidence)
+    if verdict_match.group(1).upper() == "BLOCK":
+        reason = "see review.md"
+        for line in review_text.splitlines():
+            found = REASON_RE.search(line)
+            if found:
+                reason = found.group(1).strip()[:240]
+                break
+        return [f".specs/{feature}: spec-eval verdict is BLOCK — {reason}"]
 
-    rubric = repo_rubric if repo_rubric.exists() else skill_ref_rubric
-    report_lines = [
-        f"# spec-eval: .specs/{feature}",
-        "",
-        f"Skill: `{SKILL_REL_PATH}/SKILL.md`",
-        f"Rubric: `{rubric.relative_to(root)}`",
-        "",
-        "| Result | Axis | Evidence / gap |",
-        "|--------|------|----------------|",
-    ]
-    for status, axis, detail in rows:
-        report_lines.append(f"| [{status}] | {axis} | {detail.replace('|', '/')} |")
-    report_lines.extend(["", "Verdict: " + ("BLOCK" if fails else "SHIP")])
-    return "\n".join(report_lines) + "\n", fails
+    return []
 
 
 def track(payload: dict[str, Any]) -> int:
+    """PostToolUse: remember every `.specs/<feature>` folder this turn touched."""
     root = repo_root(payload)
     features = touched_features(payload)
     if features:
@@ -221,22 +175,15 @@ def track(payload: dict[str, Any]) -> int:
 
 
 def stop(payload: dict[str, Any]) -> int:
+    """Stop: block the turn unless every touched feature has a fresh SHIP report."""
     root = repo_root(payload)
-    path = state_file(root, payload)
-    features = set(load_state(path).get("features", []))
+    features = set(load_state(state_file(root, payload)).get("features", []))
     if not features:
         return 0
 
-    reports = report_dir(root, payload)
-    reports.mkdir(parents=True, exist_ok=True)
     all_fails: list[str] = []
-    report_paths: list[Path] = []
     for feature in sorted(features):
-        report, fails = evaluate_feature(root, feature)
-        report_path = reports / f"{feature}.md"
-        report_path.write_text(report, encoding="utf-8")
-        report_paths.append(report_path)
-        all_fails.extend(f".specs/{feature}: {fail}" for fail in fails)
+        all_fails.extend(evaluate_feature(root, feature))
 
     if not all_fails:
         clear_state(root, payload)
@@ -244,8 +191,13 @@ def stop(payload: dict[str, Any]) -> int:
 
     shown = "\n".join(f"- {item}" for item in all_fails[:20])
     extra = "" if len(all_fails) <= 20 else f"\n- ... {len(all_fails) - 20} more"
-    report_note = "\nReports:\n" + "\n".join(f"- {path}" for path in report_paths)
-    reason = "spec-eval skill found [FAIL] items. Fix the spec before ending this turn.\n" + shown + extra + report_note
+    reason = (
+        "spec-eval gate blocked this turn. A .specs change is not ready to land.\n"
+        "Fix each item below, then run the spec-eval skill so it writes a fresh "
+        "review.md with a SHIP verdict. Do not end the turn until the gate passes.\n"
+        + shown
+        + extra
+    )
     sys.stdout.write(json.dumps({"decision": "block", "reason": reason}) + "\n")
     return 0
 
